@@ -2,6 +2,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { StateCreator } from "zustand";
 import { authService, LoginDto } from "@/services/auth.service";
+import {
+  clearStoredAuthTokens,
+  setStoredAuthTokens,
+} from "@/lib/auth-tokens";
 
 export interface User {
   id: string;
@@ -16,6 +20,8 @@ interface AuthState {
   selectedStockId: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
   login: (dto: LoginDto) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<User | null>;
@@ -27,6 +33,8 @@ const authStoreCreator: StateCreator<AuthState> = (set) => ({
       selectedStockId: null,
       isAuthenticated: false,
       isLoading: false,
+      accessToken: null,
+      refreshToken: null,
 
       login: async (dto) => {
         set({ isLoading: true });
@@ -35,9 +43,16 @@ const authStoreCreator: StateCreator<AuthState> = (set) => ({
           if (res.success && res.data?.user) {
             // Set session flag cookie (browser-accessible check for middleware)
             document.cookie = "AUTH_SESSION_FLAG=true; path=/; max-age=86400";
+            const accessToken = res.data.accessToken ?? null;
+            const refreshToken = res.data.refreshToken ?? null;
+            if (accessToken && refreshToken) {
+              setStoredAuthTokens({ accessToken, refreshToken });
+            }
             set({
               user: res.data.user,
               isAuthenticated: true,
+              accessToken,
+              refreshToken,
               isLoading: false,
             });
             return { success: true };
@@ -62,10 +77,13 @@ const authStoreCreator: StateCreator<AuthState> = (set) => ({
         // Clear flag cookie
         document.cookie =
           "AUTH_SESSION_FLAG=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+        clearStoredAuthTokens();
         set({
           user: null,
           selectedStockId: null,
           isAuthenticated: false,
+          accessToken: null,
+          refreshToken: null,
         });
         if (typeof window !== "undefined") {
           window.location.href = "/login";
@@ -102,6 +120,8 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         selectedStockId: state.selectedStockId,
         isAuthenticated: state.isAuthenticated,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
       }),
     }) as StateCreator<AuthState>
 );

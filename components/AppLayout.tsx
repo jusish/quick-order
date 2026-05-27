@@ -47,7 +47,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       const loggedUser = await checkAuth();
       if (!loggedUser) {
         document.cookie = "AUTH_SESSION_FLAG=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-        useAuthStore.getState().logout();
         setIsAuthChecking(false);
         toast.error(t("errors.unauthorized"));
         router.push("/login");

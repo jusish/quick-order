@@ -1,4 +1,9 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
+import {
+  clearStoredAuthTokens,
+  getStoredAuthTokens,
+  setStoredAuthTokens,
+} from "@/lib/auth-tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -43,22 +48,49 @@ api.interceptors.response.use(
         });
       }
 
+      const storedTokens = getStoredAuthTokens();
+      if (!storedTokens?.refreshToken) {
+        if (typeof window !== "undefined") {
+          document.cookie = "AUTH_SESSION_FLAG=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+          clearStoredAuthTokens();
+          window.location.href = "/login";
+        }
+        return Promise.reject(error);
+      }
+
       const config = {
         _skipRefresh: true,
       } as any;
 
-      refreshTokenPromise = api.post("/auth/refresh-token", {}, config)
-        .then(() => {
-          refreshTokenPromise = null;
+      refreshTokenPromise = api
+        .post(
+          "/auth/refresh-token",
+          {
+            refreshToken: storedTokens.refreshToken,
+          },
+          config,
+        )
+        .then((refreshResponse) => {
+          const refreshedData = refreshResponse?.data;
+          if (refreshedData?.data?.accessToken && refreshedData?.data?.refreshToken) {
+            setStoredAuthTokens({
+              accessToken: refreshedData.data.accessToken,
+              refreshToken: refreshedData.data.refreshToken,
+            });
+          }
           return api.request(originalRequest);
         })
         .catch((err) => {
           refreshTokenPromise = null;
           if (typeof window !== "undefined") {
             document.cookie = "AUTH_SESSION_FLAG=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+            clearStoredAuthTokens();
             window.location.href = "/login";
           }
           return Promise.reject(err);
+        })
+        .finally(() => {
+          refreshTokenPromise = null;
         });
 
       return refreshTokenPromise;
@@ -67,5 +99,16 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+api.interceptors.request.use((config) => {
+  const tokens = getStoredAuthTokens();
+  if (tokens?.accessToken) {
+    config.headers = config.headers ?? {};
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+    }
+  }
+  return config;
+});
 
 export default api;
