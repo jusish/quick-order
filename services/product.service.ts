@@ -37,6 +37,7 @@ export const productService = {
     params.append("stockId", stockId);
     if (search) {
       params.append("search", search);
+      params.append("name", search);
     }
     // High limit to fetch products for combobox selection
     params.append("limit", "200");
