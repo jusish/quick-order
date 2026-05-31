@@ -161,7 +161,10 @@ export default function NewOrderPage() {
       try {
         const stockId = selectedStockId === "all" ? selectedProduct.stockId : selectedStockId;
         const stockRes = await quickOrderService.getStockAvailability(selectedProduct.id, stockId);
-        if (stockRes.success) setAvailableStock(stockRes.data.available);
+        if (stockRes.success) {
+          const qty = stockRes.data.available ?? (stockRes.data as any).availableQuantity;
+          setAvailableStock(qty !== undefined ? Number(qty) : 0);
+        }
         const priceRes = await quickOrderService.getTransportPrice(selectedProduct.id, stockId);
         if (priceRes.success && priceRes.data.price !== undefined) {
           setLastTransportPrice(Number(priceRes.data.price));
@@ -218,6 +221,10 @@ export default function NewOrderPage() {
     }
     if (!quantity || Number(quantity) <= 0) {
       toast.warning(t("errors.minQuantity"));
+      return;
+    }
+    if (availableStock !== null && Number(quantity) > availableStock) {
+      toast.error(`Cannot add item: Only ${availableStock} ${selectedProduct.uom?.symbol || selectedProduct.uom.symbol} available in stock.`);
       return;
     }
     if (unitPrice === "" || Number(unitPrice) < 0) {
@@ -557,25 +564,25 @@ export default function NewOrderPage() {
 
                 {/* Stock availability info */}
                 {selectedProduct && (
-                  <div className="animate-fade-in">
+                  <div className="animate-fade-in pl-1">
                     {isCheckingStock ? (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-bold pl-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Checking stock availability...</span>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                        <span>Checking stock levels...</span>
                       </div>
                     ) : availableStock !== null ? (
                       quantity !== "" && Number(quantity) > availableStock ? (
-                        <div className="bg-destructive/10 text-destructive border border-destructive/20 px-3 py-2 rounded-md flex items-start gap-2 text-xs font-bold">
-                          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <div className="text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                           <span>
-                            {t("order.stockWarning", { available: availableStock, uom: selectedProduct.uom.symbol })}
+                            Only {availableStock} {selectedProduct.uom?.symbol || selectedProduct.uom.symbol} available in stock (exceeded by {(Number(quantity) - availableStock).toFixed(2)})
                           </span>
                         </div>
                       ) : (
-                        <div className="text-emerald-600 dark:text-emerald-400 text-xs font-bold pl-1 flex items-center gap-1.5">
-                          <CheckCircle className="w-4 h-4" />
+                        <div className="text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
                           <span>
-                            {t("order.stockOk", { available: availableStock, uom: selectedProduct.uom.symbol })}
+                            {availableStock} {selectedProduct.uom?.symbol || selectedProduct.uom.symbol} available in stock
                           </span>
                         </div>
                       )
@@ -598,9 +605,18 @@ export default function NewOrderPage() {
                       type="number"
                       inputMode="decimal"
                       value={quantity}
-                      onChange={(e) => setQuantity(e.target.value === "" ? "" : Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setQuantity(val === "" ? "" : Number(val));
+                      }}
                       placeholder="0.00"
-                      className="h-9"
+                      className={`h-9 font-bold transition-all duration-300 ${
+                        availableStock !== null && quantity !== "" && Number(quantity) > availableStock
+                          ? "border-rose-500 focus-visible:ring-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/5 focus-visible:border-rose-500/60"
+                          : availableStock !== null && quantity !== "" && Number(quantity) > 0
+                          ? "border-emerald-500 focus-visible:ring-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 focus-visible:border-emerald-500/60"
+                          : ""
+                      }`}
                     />
                   </div>
 
@@ -694,7 +710,8 @@ export default function NewOrderPage() {
                 <Button
                   type="button"
                   onClick={handleAddItem}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-600/15"
+                  disabled={availableStock !== null && quantity !== "" && Number(quantity) > availableStock}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-600/15 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{t("order.addBtn")}</span>
