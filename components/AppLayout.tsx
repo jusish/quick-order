@@ -60,7 +60,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         setStocks(loadedStocks);
         if (loadedStocks.length > 0) {
           const currentSelected = useAuthStore.getState().selectedStockId;
-          if (!currentSelected || !loadedStocks.some((s) => s.id === currentSelected)) {
+          if (!currentSelected || (currentSelected !== "all" && !loadedStocks.some((s) => s.id === currentSelected))) {
             setSelectedStockId(loadedStocks[0].id);
           }
         } else {
@@ -79,7 +79,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const handleStockChange = (value: string | null) => {
     if (!value) return;
     setSelectedStockId(value);
-    toast.info(`Switched stock to ${stocks.find((s) => s.id === value)?.name}`);
+    toast.info(value === "all" ? "Switched to All Stocks" : `Switched stock to ${stocks.find((s) => s.id === value)?.name}`);
   };
 
   if (isAuthChecking || (isStocksLoading && stocks.length === 0)) {
@@ -122,10 +122,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <Select value={selectedStockId || ""} onValueChange={handleStockChange}>
                   <SelectTrigger className="h-auto border-0 bg-transparent p-0 text-xs sm:text-sm font-bold shadow-none focus-visible:ring-0 w-auto min-w-[80px]">
                     <SelectValue>
-                      {(value) => stocks.find((stock) => stock.id === value)?.name ?? value}
+                      {(value) => value === "all" ? "All Stocks" : (stocks.find((stock) => stock.id === value)?.name ?? value)}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">All Stocks</SelectItem>
                     {stocks.map((stock) => (
                       <SelectItem key={stock.id} value={stock.id}>
                         {stock.name}

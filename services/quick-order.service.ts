@@ -73,6 +73,7 @@ export interface QuickOrder {
     notes?: string;
     product: {
       name: string;
+      stockId: string;
     };
     uom: {
       symbol: string;

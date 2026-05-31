@@ -34,13 +34,15 @@ export interface ProductsResponse {
 export const productService = {
   async getProductsByStock(stockId: string, search?: string): Promise<Product[]> {
     const params = new URLSearchParams();
-    params.append("stockId", stockId);
+    if (stockId && stockId !== "all") {
+      params.append("stockId", stockId);
+    }
     if (search) {
       params.append("search", search);
       params.append("name", search);
     }
     // High limit to fetch products for combobox selection
-    params.append("limit", "200");
+    params.append("limit", "1000");
     params.append("status", "ENABLED");
 
     const response = await api.get(`/products?${params.toString()}`);

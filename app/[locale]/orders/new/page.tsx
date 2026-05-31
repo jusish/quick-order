@@ -47,6 +47,7 @@ import {
 interface ItemTemp extends QuickOrderItemDto {
   id: string;
   productName: string;
+  stockId: string;
   uomSymbol: string;
   lineTotal: number;
 }
@@ -117,7 +118,10 @@ export default function NewOrderPage() {
     const loadUoms = async () => {
       if (!selectedStockId) return;
       try {
-        const res = await api.get(`/unit-of-measure/stock/${selectedStockId}`);
+        const url = selectedStockId === "all"
+          ? `/unit-of-measure/stock`
+          : `/unit-of-measure/stock/${selectedStockId}`;
+        const res = await api.get(url);
         if (res.data?.success && res.data?.data) {
           setUoms(res.data.data);
         }
@@ -155,9 +159,10 @@ export default function NewOrderPage() {
     const checkDetails = async () => {
       setIsCheckingStock(true);
       try {
-        const stockRes = await quickOrderService.getStockAvailability(selectedProduct.id, selectedStockId);
+        const stockId = selectedStockId === "all" ? selectedProduct.stockId : selectedStockId;
+        const stockRes = await quickOrderService.getStockAvailability(selectedProduct.id, stockId);
         if (stockRes.success) setAvailableStock(stockRes.data.available);
-        const priceRes = await quickOrderService.getTransportPrice(selectedProduct.id, selectedStockId);
+        const priceRes = await quickOrderService.getTransportPrice(selectedProduct.id, stockId);
         if (priceRes.success && priceRes.data.price !== undefined) {
           setLastTransportPrice(Number(priceRes.data.price));
           if (hasTransport) setTransportPrice(Number(priceRes.data.price));
@@ -193,7 +198,7 @@ export default function NewOrderPage() {
     }
   };
 
-  const filteredProducts = React.useMemo(() => products.slice(0, 15), [products]);
+  const filteredProducts = React.useMemo(() => products.slice(0, 100), [products]);
   const filteredCustomers = React.useMemo(() => customers.slice(0, 5), [customers]);
 
   const selectedProductUom = React.useMemo(() => {
@@ -230,6 +235,7 @@ export default function NewOrderPage() {
       id: Math.random().toString(36).substring(7),
       productId: selectedProduct.id,
       productName: selectedProduct.name,
+      stockId: selectedProduct.stockId,
       quantity: qty,
       unitPrice: price,
       transportPrice: trans,
@@ -309,9 +315,13 @@ export default function NewOrderPage() {
         ? `[CustomerId: ${selectedCustomerId}]${notes.trim()}`
         : notes.trim();
 
+      const payloadStockId = selectedStockId === "all"
+        ? items[0].stockId
+        : selectedStockId;
+
       const orderPayload: CreateQuickOrderDto = {
         title: customerName.trim() || "Walk-In Customer",
-        stockId: selectedStockId,
+        stockId: payloadStockId,
         status,
         notes: notesString || undefined,
         subtotal: totals.subtotal,

@@ -54,6 +54,7 @@ import {
 interface ItemTemp extends QuickOrderItemDto {
   id: string;
   productName: string;
+  stockId: string;
   uomSymbol: string;
   lineTotal: number;
 }
@@ -128,6 +129,7 @@ export default function OrderDetailPage() {
         id: item.id,
         productId: item.productId,
         productName: item.product.name,
+        stockId: item.product.stockId,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
         transportPrice: Number(item.transportPrice),
@@ -144,7 +146,10 @@ export default function OrderDetailPage() {
     if (!selectedStockId || isPushed) return;
     const loadUoms = async () => {
       try {
-        const res = await api.get(`/unit-of-measure/stock/${selectedStockId}`);
+        const url = selectedStockId === "all"
+          ? `/unit-of-measure/stock`
+          : `/unit-of-measure/stock/${selectedStockId}`;
+        const res = await api.get(url);
         if (res.data?.success && res.data?.data) setUoms(res.data.data);
       } catch (err) {
         console.error("Failed to load UoMs", err);
@@ -192,7 +197,7 @@ export default function OrderDetailPage() {
   }, [selectedStockId, isPushed, productSearch]);
 
   // filteredProducts: server already filtered, just slice for display
-  const filteredProducts = React.useMemo(() => products.slice(0, 15), [products]);
+  const filteredProducts = React.useMemo(() => products.slice(0, 100), [products]);
 
   // Check stock and last transport price
   React.useEffect(() => {
@@ -204,9 +209,10 @@ export default function OrderDetailPage() {
     const checkDetails = async () => {
       setIsCheckingStock(true);
       try {
-        const stockRes = await quickOrderService.getStockAvailability(selectedProduct.id, selectedStockId);
+        const stockId = selectedStockId === "all" ? selectedProduct.stockId : selectedStockId;
+        const stockRes = await quickOrderService.getStockAvailability(selectedProduct.id, stockId);
         if (stockRes.success) setAvailableStock(stockRes.data.available);
-        const priceRes = await quickOrderService.getTransportPrice(selectedProduct.id, selectedStockId);
+        const priceRes = await quickOrderService.getTransportPrice(selectedProduct.id, stockId);
         if (priceRes.success && priceRes.data.price !== undefined) {
           setLastTransportPrice(Number(priceRes.data.price));
           if (hasTransport) setTransportPrice(Number(priceRes.data.price));
@@ -265,6 +271,7 @@ export default function OrderDetailPage() {
       id: Math.random().toString(36).substring(7),
       productId: selectedProduct.id,
       productName: selectedProduct.name,
+      stockId: selectedProduct.stockId,
       quantity: qty,
       unitPrice: price,
       transportPrice: trans,
